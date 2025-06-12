@@ -58,14 +58,9 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
-    password_hash = db.Column(db.String(200), nullable=False)
+    password = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
-
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password, method='pbkdf2:sha256')
-
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
         return f'<User {self.name}>'
@@ -76,7 +71,7 @@ class Contact(db.Model):
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), nullable=False)
     message = db.Column(db.Text, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
@@ -232,7 +227,8 @@ def contact():
             new_contact = Contact(
                 name=name,
                 email=email,
-                message=message
+                message=message,
+                user_id=session.get('user_id')  # Set the user_id from session
             )
             
             # Save to database
@@ -244,10 +240,11 @@ def contact():
             return redirect(url_for('contact'))
             
         except Exception as e:
-            # Flash error message
-            flash('An error occurred. Please try again.', 'error')
-            return render_template('contact.html')
-            
+            print(f"Error in contact form: {str(e)}")
+            db.session.rollback()
+            flash('An error occurred. Please try again.', 'danger')
+            return redirect(url_for('contact'))
+    
     return render_template('contact.html')
 
 @app.route('/predict',methods=['POST'])
@@ -399,7 +396,7 @@ def login():
 
 @app.route('/logout')
 def logout():
-    session.clear()
+    session.clear()  # Clear all session data
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('index'))
 
@@ -459,7 +456,7 @@ def admin_login():
         # Find user with admin role
         user = User.query.filter_by(email=email, is_admin=True).first()
         
-        if user and check_password_hash(user.password_hash, password):
+        if user and check_password_hash(user.password, password):
             session['user_id'] = user.id
             session['is_admin'] = True
             flash('Admin login successful!', 'success')
@@ -488,7 +485,7 @@ def create_admin():
         
         if admin:
             # Reset admin password
-            admin.password_hash = generate_password_hash('admin123')
+            admin.password = generate_password_hash('admin123')
             admin.is_admin = True  # Ensure admin flag is set
             db.session.commit()
             flash('Admin password has been reset to: admin123', 'success')
@@ -497,7 +494,7 @@ def create_admin():
             admin = User(
                 name='Admin',
                 email='admin@flysense.com',
-                password_hash=generate_password_hash('admin123'),
+                password=generate_password_hash('admin123'),
                 is_admin=True
             )
             db.session.add(admin)
@@ -507,6 +504,7 @@ def create_admin():
         return redirect(url_for('admin_login'))
     except Exception as e:
         print(f"Error creating admin: {str(e)}")
+        db.session.rollback()
         flash('Error creating admin account', 'danger')
         return redirect(url_for('index'))
 
@@ -529,9 +527,9 @@ def admin():
 
 @app.route('/admin_logout')
 def admin_logout():
-    session.pop('admin_id', None)
-    flash('Logged out successfully', 'success')
-    return redirect(url_for('home'))
+    session.clear()  # Clear all session data
+    flash('You have been logged out successfully.', 'success')
+    return redirect(url_for('index'))
 
 @app.route('/delete_contact/<int:contact_id>')
 @admin_required
@@ -566,5 +564,21 @@ def delete_user(user_id):
     return redirect(url_for('admin'))
 
 if __name__ == '__main__':
-	app.run(debug=True)
+    with app.app_context():
+        db.create_all()
+        # Check if admin exists, if not create one
+        admin = User.query.filter_by(email='admin@flysense.com').first()
+        if not admin:
+            admin = User(
+                name='Admin',
+                email='admin@flysense.com',
+                password_hash=generate_password_hash('admin123'),
+                is_admin=True
+            )
+            db.session.add(admin)
+            db.session.commit()
+            print("Admin account created!")
+    
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
 # For mac, make 'app.run(debug=True)'
