@@ -1,7 +1,5 @@
 # Flight-Delay-Prediction
 
-<img src="static/background.jpg" width="1000" height="200">
-
 ## Introduction
 This project focuses on analyzing historical flight data to uncover key factors contributing to flight delays and to build a predictive model to forecast delays. It explores the impact of variables like month, day, destination, time of day, and airline on delay patterns. The study aims to answer key questions about delay trends and identify which factors contribute most. The final goal is to help passengers and airlines anticipate and reduce delays. External causes like weather and technical issues are not considered due to their low frequency and regional variability.
 
