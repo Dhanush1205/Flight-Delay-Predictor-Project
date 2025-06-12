@@ -14,6 +14,9 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import requests  # Add this import at the top with other imports
+import joblib
+import warnings
+warnings.filterwarnings('ignore')
 
 # Initialize Flask app
 app = Flask(__name__, 
@@ -54,16 +57,19 @@ db = SQLAlchemy(app)
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_admin = db.Column(db.Boolean, default=False)
+    contacts = db.relationship('Contact', backref='user', lazy=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password, method='pbkdf2:sha256')
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    def __repr__(self):
+        return f'<User {self.name}>'
 
 # Contact Model
 class Contact(db.Model):
@@ -198,10 +204,7 @@ def create_route_map(origin, destination, is_delayed):
 
 @app.route('/')
 def index():
-    if 'user_id' in session:
-        if session.get('is_admin'):
-            return redirect(url_for('admin'))
-        return redirect(url_for('home'))
+    # Always show login page first
     return render_template('login.html')
 
 @app.route('/home')
@@ -376,11 +379,6 @@ def history():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if 'user_id' in session:
-        if session.get('is_admin'):
-            return redirect(url_for('admin'))
-        return redirect(url_for('home'))
-        
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -448,9 +446,6 @@ def signup():
 
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
-    if 'user_id' in session and session.get('is_admin'):
-        return redirect(url_for('admin'))
-        
     try:
         if request.method == 'POST':
             email = request.form.get('email')
