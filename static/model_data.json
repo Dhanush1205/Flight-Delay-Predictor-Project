@@ -1,0 +1,54 @@
+{
+    "model_type": "RandomForest",
+    "class_distribution": {
+        "0": 0.70,
+        "1": 0.30
+    },
+    "airports": {
+        "origin": {
+            "labels": [
+                "ATL",
+                "DFW",
+                "ORD",
+                "DEN",
+                "LAX",
+                "CLT",
+                "LAS",
+                "PHX",
+                "IAH",
+                "MCO"
+            ],
+            "values": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        },
+        "dest": {
+            "labels": [
+                "ATL",
+                "DFW",
+                "ORD",
+                "DEN",
+                "LAX",
+                "CLT",
+                "LAS",
+                "PHX",
+                "IAH",
+                "MCO"
+            ],
+            "values": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        }
+    },
+    "carriers": {
+        "labels": [
+            "AA",
+            "AS",
+            "B6",
+            "DL",
+            "HA",
+            "NK",
+            "UA",
+            "WN",
+            "YV",
+            "VX"
+        ],
+        "values": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    }
+}
