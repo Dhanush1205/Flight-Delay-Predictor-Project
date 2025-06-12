@@ -429,12 +429,12 @@ def admin_login():
         user = User.query.filter_by(email=email).first()
         
         if user and user.is_admin and user.check_password(password):
-            session['admin_id'] = user.id
+            session['user_id'] = user.id
+            session['is_admin'] = True
             flash('Welcome back, Admin!', 'success')
             return redirect(url_for('admin'))
         else:
             flash('Invalid email or password', 'error')
-            return render_template('admin_login.html')
     
     return render_template('admin_login.html')
 
@@ -442,16 +442,9 @@ def admin_login():
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        admin_id = session.get('admin_id')
-        if not admin_id:
-            flash('Please login as admin first', 'error')
+        if 'user_id' not in session or not session.get('is_admin'):
+            flash('Please login as admin to access this page', 'error')
             return redirect(url_for('admin_login'))
-        
-        admin_user = User.query.get(admin_id)
-        if not admin_user or not admin_user.is_admin:
-            flash('Unauthorized access', 'error')
-            return redirect(url_for('home'))
-            
         return f(*args, **kwargs)
     return decorated_function
 
@@ -502,25 +495,21 @@ def delete_user(user_id):
 
 @app.route('/create_admin')
 def create_admin():
-    try:
-        # Check if admin already exists
-        admin = User.query.filter_by(email='admin@flysense.com').first()
-        if admin:
-            return 'Admin account already exists!'
-        
-        # Create admin user with simple credentials
+    # Create admin user if it doesn't exist
+    admin = User.query.filter_by(email='admin@example.com').first()
+    if not admin:
         admin = User(
             name='Admin',
-            email='admin@flysense.com',
+            email='admin@example.com',
             is_admin=True
         )
-        admin.set_password('admin123')
-        
+        admin.set_password('admin123')  # Set a default password
         db.session.add(admin)
         db.session.commit()
-        return 'Admin account created successfully! Email: admin@flysense.com, Password: admin123'
-    except Exception as e:
-        return f'Error creating admin account: {str(e)}'
+        flash('Admin account created successfully!', 'success')
+    else:
+        flash('Admin account already exists!', 'info')
+    return redirect(url_for('admin_login'))
 
 if __name__ == '__main__':
 	app.run(debug=False)
