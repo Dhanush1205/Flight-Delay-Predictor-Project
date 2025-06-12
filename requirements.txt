@@ -2,6 +2,7 @@
 Flask==2.2.5
 Flask-SQLAlchemy==3.1.1
 Werkzeug==2.2.3
+cryptography==42.0.8
 
 # Data Processing and Analysis
 pandas==2.2.2
@@ -29,3 +30,9 @@ python-dotenv==1.0.1
 
 # Server
 gunicorn==21.2.0  # for Render deployment
+
+# Additional Dependencies
+click==8.1.7
+itsdangerous==2.1.2
+Jinja2==3.1.3
+MarkupSafe==2.1.5
