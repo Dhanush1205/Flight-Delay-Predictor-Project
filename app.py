@@ -443,6 +443,12 @@ def signup():
 
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
+    # Check if admin exists
+    admin = User.query.filter_by(email='admin@flysense.com', is_admin=True).first()
+    if not admin:
+        flash('Admin account not found. Please contact system administrator.', 'danger')
+        return redirect(url_for('index'))
+
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -483,6 +489,7 @@ def create_admin():
         if admin:
             # Reset admin password
             admin.password_hash = generate_password_hash('admin123')
+            admin.is_admin = True  # Ensure admin flag is set
             db.session.commit()
             flash('Admin password has been reset to: admin123', 'success')
         else:
@@ -501,7 +508,7 @@ def create_admin():
     except Exception as e:
         print(f"Error creating admin: {str(e)}")
         flash('Error creating admin account', 'danger')
-        return redirect(url_for('admin_login'))
+        return redirect(url_for('index'))
 
 # Admin authentication decorator
 def admin_required(f):
