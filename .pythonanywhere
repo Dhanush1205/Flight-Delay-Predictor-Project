@@ -1,0 +1,5 @@
+[webapp:dhanush12.pythonanywhere.com]
+static_files = {
+    '/static': 'static',
+    '/templates': 'templates'
+}
