@@ -16,7 +16,11 @@ from functools import wraps
 import requests  # Add this import at the top with other imports
 
 # Initialize Flask app
-app = Flask(__name__)
+app = Flask(__name__, 
+    static_url_path='/static',
+    static_folder='static',
+    template_folder='templates'
+)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 
 # Configure password hashing
@@ -176,7 +180,7 @@ def create_route_map(origin, destination, is_delayed):
 def index():
     if 'user_id' in session:
         return redirect(url_for('home'))
-    return redirect(url_for('login'))
+    return render_template('login.html')
 
 @app.route('/home')
 @login_required
@@ -350,7 +354,6 @@ def history():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # If user is already logged in, redirect to home
     if 'user_id' in session:
         return redirect(url_for('home'))
         
@@ -362,13 +365,12 @@ def login():
         
         if user and user.check_password(password):
             session['user_id'] = user.id
-            session['is_admin'] = user.is_admin  # Store admin status in session
+            session['is_admin'] = user.is_admin
             flash('Welcome back!', 'success')
             return redirect(url_for('home'))
         else:
             flash('Invalid email or password', 'error')
-            return render_template('login.html')
-            
+    
     return render_template('login.html')
 
 @app.route('/logout')
@@ -422,6 +424,9 @@ def signup():
 
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
+    if 'user_id' in session and session.get('is_admin'):
+        return redirect(url_for('admin'))
+        
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
