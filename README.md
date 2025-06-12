@@ -9,9 +9,6 @@ This project focuses on analyzing historical flight data to uncover key factors 
 Dataset obtained from Kaggle: <br>
 https://www.kaggle.com/lampubhutia/nyc-flight-delay
 
-## Project Design
-<img alt="DFD" src="https://user-images.githubusercontent.com/43583040/83272042-4e844f80-a1e8-11ea-99d1-d5f15d114e90.png" width="1000" height="400">
-
 ## Technologies Used
 * Python
 * HTML
