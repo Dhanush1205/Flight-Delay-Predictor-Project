@@ -1,39 +1,8 @@
-# Web Framework
-Flask==2.2.5
-Flask-SQLAlchemy==3.1.1
-Werkzeug==2.2.3
-cryptography==42.0.8
-
-# Data Processing and Analysis
-pandas==2.2.2
-numpy==1.26.4
-
-# Machine Learning
-scikit-learn==1.3.2
-
-# Visualization
-matplotlib==3.8.4
-seaborn==0.12.2
-
-# Mapping and Geocoding
+Flask==2.0.1
+pandas==1.3.3
+scikit-learn==0.24.2
+numpy==1.21.2
 folium==0.14.0
 geopy==2.3.0
-
-# HTTP Requests
-requests==2.31.0
-
-# Database
-SQLAlchemy==2.0.29
-
-# Development Tools
-python-dotenv==1.0.1
-
-# Server
-gunicorn==21.2.0  # for Render deployment
-
-# Additional Dependencies
-click==8.1.7
-itsdangerous==2.1.2
-Jinja2==3.1.3
-MarkupSafe==2.1.5
-passlib==1.7.4  # for password hashing
+Flask-SQLAlchemy==2.5.1
+Werkzeug==2.0.1

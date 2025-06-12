@@ -14,29 +14,10 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import requests  # Add this import at the top with other imports
-import joblib
-import warnings
-warnings.filterwarnings('ignore')
 
 # Initialize Flask app
-app = Flask(__name__, 
-    static_url_path='/static',
-    static_folder='static',
-    template_folder='templates'
-)
-app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
-
-# Configure session
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
-
-# Configure password hashing
-app.config['SECURITY_PASSWORD_HASH'] = 'pbkdf2_sha256'
-app.config['SECURITY_PASSWORD_SALT'] = os.environ.get('SECURITY_PASSWORD_SALT', os.urandom(24).hex())
-
-# Get the absolute path to the Data directory
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DATA_DIR = os.path.join(BASE_DIR, 'Data')
+app = Flask(__name__)
+app.secret_key = os.urandom(24)
 
 # Login required decorator
 def login_required(f):
@@ -49,7 +30,7 @@ def login_required(f):
     return decorated_function
 
 # Database Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///flysense.db').replace('postgres://', 'postgresql://')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///flysense.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -57,92 +38,67 @@ db = SQLAlchemy(app)
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(100), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
-    is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_admin = db.Column(db.Boolean, default=False)
 
-    def __repr__(self):
-        return f'<User {self.name}>'
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 # Contact Model
 class Contact(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), nullable=False)
     message = db.Column(db.Text, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
         return f'<Contact {self.name}>'
 
-# Initialize database
+# Create database tables
 with app.app_context():
-    try:
-        # Drop all tables and recreate
-        db.drop_all()
-        db.create_all()
-        
-        # Create admin account if it doesn't exist
-        admin = User.query.filter_by(email='admin@flysense.com').first()
-        if not admin:
-            admin = User(
-                name='Admin',
-                email='admin@flysense.com',
-                password_hash=generate_password_hash('admin123'),
-                is_admin=True
-            )
-            db.session.add(admin)
-            db.session.commit()
-            print("Admin account created successfully!")
-    except Exception as e:
-        print(f"Error during database initialization: {str(e)}")
-        db.session.rollback()
+    db.create_all()
 
-try:
-    # Import dataset with absolute path
-    data_file = os.path.join(DATA_DIR, 'Processed_data15.csv')
-    if not os.path.exists(data_file):
-        raise FileNotFoundError(f"Data file not found: {data_file}")
-    
-    df = pd.read_csv(data_file)
-    
-    # Set year range (extending to future)
-    min_year = df['year'].min()  # 2013
-    max_year = 2043  # Extending to 20 years in future
+# Import dataset 
+df = pd.read_csv('Data/Processed_data15.csv')
 
-    # Label Encoding
-    le_carrier = LabelEncoder()
-    df['carrier'] = le_carrier.fit_transform(df['carrier'])
+# Set year range (extending to future)
+min_year = df['year'].min()  # 2013
+max_year = 2043  # Extending to 20 years in future
 
-    le_dest = LabelEncoder()
-    df['dest'] = le_dest.fit_transform(df['dest'])
+# Label Encoding
+le_carrier = LabelEncoder()
+df['carrier'] = le_carrier.fit_transform(df['carrier'])
 
-    le_origin = LabelEncoder()
-    df['origin'] = le_origin.fit_transform(df['origin'])
+le_dest = LabelEncoder()
+df['dest'] = le_dest.fit_transform(df['dest'])
 
-    # Converting Pandas DataFrame into a Numpy array
-    X = df.iloc[:, 0:6].values # from column(years) to column(distance)
-    y = df['delayed']
+le_origin = LabelEncoder()
+df['origin'] = le_origin.fit_transform(df['origin'])
 
-    X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.25,random_state=61)
+# Converting Pandas DataFrame into a Numpy array
+X = df.iloc[:, 0:6].values # from column(years) to column(distance)
+y = df['delayed']
 
-    # Create and train Random Forest
-    rf_classifier = RandomForestClassifier(
-        n_estimators=200,  # Increase number of trees
-        max_depth=10,      # Increase depth
-        min_samples_split=5,
-        min_samples_leaf=2,
-        class_weight='balanced',  # Handle class imbalance
-        random_state=42
-    )
-    rf_classifier.fit(X_train, y_train)
+X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.25,random_state=61)
 
-    model = rf_classifier  # Use Random Forest for predictions
-except Exception as e:
-    print(f"Error loading data: {str(e)}")
-    raise
+# Create and train Random Forest
+rf_classifier = RandomForestClassifier(
+    n_estimators=200,  # Increase number of trees
+    max_depth=10,      # Increase depth
+    min_samples_split=5,
+    min_samples_leaf=2,
+    class_weight='balanced',  # Handle class imbalance
+    random_state=42
+)
+rf_classifier.fit(X_train, y_train)
+
+model = rf_classifier  # Use Random Forest for predictions
 
 # Replace Aviationstack with OpenSky configuration
 OPENSKY_BASE_URL = 'https://opensky-network.org/api'
@@ -202,8 +158,9 @@ def create_route_map(origin, destination, is_delayed):
 
 @app.route('/')
 def index():
-    # Always show login page first
-    return render_template('login.html')
+    if 'user_id' in session:
+        return redirect(url_for('home'))
+    return redirect(url_for('login'))
 
 @app.route('/home')
 @login_required
@@ -230,8 +187,7 @@ def contact():
             new_contact = Contact(
                 name=name,
                 email=email,
-                message=message,
-                user_id=session.get('user_id')  # Set the user_id from session
+                message=message
             )
             
             # Save to database
@@ -243,11 +199,10 @@ def contact():
             return redirect(url_for('contact'))
             
         except Exception as e:
-            print(f"Error in contact form: {str(e)}")
-            db.session.rollback()
-            flash('An error occurred. Please try again.', 'danger')
-            return redirect(url_for('contact'))
-    
+            # Flash error message
+            flash('An error occurred. Please try again.', 'error')
+            return render_template('contact.html')
+            
     return render_template('contact.html')
 
 @app.route('/predict',methods=['POST'])
@@ -379,6 +334,10 @@ def history():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # If user is already logged in, redirect to home
+    if 'user_id' in session:
+        return redirect(url_for('home'))
+        
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -387,137 +346,96 @@ def login():
         
         if user and user.check_password(password):
             session['user_id'] = user.id
-            session['is_admin'] = user.is_admin
+            session['is_admin'] = user.is_admin  # Store admin status in session
             flash('Welcome back!', 'success')
-            if user.is_admin:
-                return redirect(url_for('admin'))
             return redirect(url_for('home'))
         else:
             flash('Invalid email or password', 'error')
-    
+            return render_template('login.html')
+            
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
-    session.clear()  # Clear all session data
-    flash('You have been logged out successfully.', 'success')
-    return redirect(url_for('index'))
+    session.pop('user_id', None)
+    session.pop('is_admin', None)  # Remove admin status from session
+    session.pop('predictions', None)
+    flash('You have been logged out', 'success')
+    return redirect(url_for('login'))
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
+    # If user is already logged in, redirect to home
+    if 'user_id' in session:
+        return redirect(url_for('home'))
+        
     if request.method == 'POST':
-        name = request.form.get('name')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        
-        # Check if user already exists
-        existing_user = User.query.filter_by(email=email).first()
-        if existing_user:
-            flash('Email already registered!', 'danger')
-            return redirect(url_for('signup'))
-        
-        # Create new user
-        new_user = User(
-            name=name,
-            email=email,
-            password_hash=generate_password_hash(password),
-            is_admin=False
-        )
-        
         try:
+            # Get form data
+            name = request.form.get('name')
+            email = request.form.get('email')
+            password = request.form.get('password')
+            confirm_password = request.form.get('confirm_password')
+
+            # Validate passwords match
+            if password != confirm_password:
+                flash('Passwords do not match!', 'error')
+                return render_template('signup.html')
+
+            # Check if user already exists
+            if User.query.filter_by(email=email).first():
+                flash('Email already registered!', 'error')
+                return render_template('signup.html')
+
+            # Create new user
+            new_user = User(name=name, email=email)
+            new_user.set_password(password)
+            
+            # Save to database
             db.session.add(new_user)
             db.session.commit()
             
-            # Log in the user automatically
-            session['user_id'] = new_user.id
-            session['is_admin'] = False
+            flash('Registration successful! Please login.', 'success')
+            return redirect(url_for('login'))
             
-            flash('Registration successful! You are now logged in.', 'success')
-            return redirect(url_for('home'))
         except Exception as e:
-            db.session.rollback()
-            flash('Error creating account. Please try again.', 'danger')
-            return redirect(url_for('signup'))
-    
+            flash('An error occurred during registration.', 'error')
+            return render_template('signup.html')
+            
     return render_template('signup.html')
 
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
-    # Check if admin exists
-    admin = User.query.filter_by(email='admin@flysense.com', is_admin=True).first()
-    if not admin:
-        flash('Admin account not found. Please contact system administrator.', 'danger')
-        return redirect(url_for('index'))
-
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
         
-        # Debug logging
-        print(f"Admin login attempt - Email: {email}")
+        user = User.query.filter_by(email=email).first()
         
-        # Find user with admin role
-        user = User.query.filter_by(email=email, is_admin=True).first()
-        
-        if user and check_password_hash(user.password_hash, password):
-            session['user_id'] = user.id
-            session['is_admin'] = True
-            flash('Admin login successful!', 'success')
+        if user and user.is_admin and user.check_password(password):
+            session['admin_id'] = user.id
+            flash('Welcome back, Admin!', 'success')
             return redirect(url_for('admin'))
         else:
-            flash('Invalid admin credentials!', 'danger')
-            return redirect(url_for('admin_login'))
+            flash('Invalid email or password', 'error')
+            return render_template('admin_login.html')
     
     return render_template('admin_login.html')
-
-@app.route('/admin')
-def admin():
-    if not session.get('is_admin'):
-        flash('Please login as admin first!', 'danger')
-        return redirect(url_for('admin_login'))
-    
-    users = User.query.all()
-    contacts = Contact.query.all()
-    return render_template('admin.html', users=users, contacts=contacts)
-
-@app.route('/create_admin')
-def create_admin():
-    try:
-        # Check if admin already exists
-        admin = User.query.filter_by(email='admin@flysense.com').first()
-        
-        if admin:
-            # Reset admin password
-            admin.password_hash = generate_password_hash('admin123')
-            admin.is_admin = True  # Ensure admin flag is set
-            db.session.commit()
-            flash('Admin password has been reset to: admin123', 'success')
-        else:
-            # Create new admin account
-            admin = User(
-                name='Admin',
-                email='admin@flysense.com',
-                password_hash=generate_password_hash('admin123'),
-                is_admin=True
-            )
-            db.session.add(admin)
-            db.session.commit()
-            flash('Admin account created with password: admin123', 'success')
-        
-        return redirect(url_for('admin_login'))
-    except Exception as e:
-        print(f"Error creating admin: {str(e)}")
-        db.session.rollback()
-        flash('Error creating admin account', 'danger')
-        return redirect(url_for('index'))
 
 # Admin authentication decorator
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session or not session.get('is_admin'):
-            flash('Please login as admin to access this page', 'error')
+        admin_id = session.get('admin_id')
+        if not admin_id:
+            flash('Please login as admin first', 'error')
             return redirect(url_for('admin_login'))
+        
+        admin_user = User.query.get(admin_id)
+        if not admin_user or not admin_user.is_admin:
+            flash('Unauthorized access', 'error')
+            return redirect(url_for('home'))
+            
         return f(*args, **kwargs)
     return decorated_function
 
@@ -530,9 +448,9 @@ def admin():
 
 @app.route('/admin_logout')
 def admin_logout():
-    session.clear()  # Clear all session data
-    flash('You have been logged out successfully.', 'success')
-    return redirect(url_for('index'))
+    session.pop('admin_id', None)
+    flash('Logged out successfully', 'success')
+    return redirect(url_for('home'))
 
 @app.route('/delete_contact/<int:contact_id>')
 @admin_required
@@ -566,22 +484,28 @@ def delete_user(user_id):
     
     return redirect(url_for('admin'))
 
-if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        # Check if admin exists, if not create one
+@app.route('/create_admin')
+def create_admin():
+    try:
+        # Check if admin already exists
         admin = User.query.filter_by(email='admin@flysense.com').first()
-        if not admin:
-            admin = User(
-                name='Admin',
-                email='admin@flysense.com',
-                password_hash=generate_password_hash('admin123'),
-                is_admin=True
-            )
-            db.session.add(admin)
-            db.session.commit()
-            print("Admin account created!")
-    
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+        if admin:
+            return 'Admin account already exists!'
+        
+        # Create admin user with simple credentials
+        admin = User(
+            name='Admin',
+            email='admin@flysense.com',
+            is_admin=True
+        )
+        admin.set_password('admin123')
+        
+        db.session.add(admin)
+        db.session.commit()
+        return 'Admin account created successfully! Email: admin@flysense.com, Password: admin123'
+    except Exception as e:
+        return f'Error creating admin account: {str(e)}'
+
+if __name__ == '__main__':
+	app.run(debug=False)
 # For mac, make 'app.run(debug=True)'
