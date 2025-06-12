@@ -440,14 +440,22 @@ def admin_login():
             email = request.form.get('email')
             password = request.form.get('password')
             
+            print(f"Attempting admin login with email: {email}")  # Debug log
+            
             user = User.query.filter_by(email=email).first()
             
-            if user and user.is_admin and user.check_password(password):
-                session['user_id'] = user.id
-                session['is_admin'] = True
-                flash('Welcome back, Admin!', 'success')
-                return redirect(url_for('admin'))
+            if user:
+                print(f"User found: {user.name}, is_admin: {user.is_admin}")  # Debug log
+                if user.is_admin and user.check_password(password):
+                    session['user_id'] = user.id
+                    session['is_admin'] = True
+                    flash('Welcome back, Admin!', 'success')
+                    return redirect(url_for('admin'))
+                else:
+                    print("Password check failed or user is not admin")  # Debug log
+                    flash('Invalid admin credentials', 'error')
             else:
+                print("No user found with this email")  # Debug log
                 flash('Invalid admin credentials', 'error')
         
         return render_template('admin_login.html')
@@ -455,6 +463,33 @@ def admin_login():
         print(f"Error in admin_login: {str(e)}")
         flash('An error occurred. Please try again.', 'error')
         return render_template('admin_login.html')
+
+@app.route('/create_admin')
+def create_admin():
+    try:
+        # Check if admin already exists
+        admin = User.query.filter_by(email='admin@flysense.com').first()
+        if admin:
+            # Update admin password to ensure it's correct
+            admin.set_password('admin123')
+            db.session.commit()
+            flash('Admin account exists! Password has been reset. Email: admin@flysense.com, Password: admin123', 'success')
+        else:
+            # Create admin user
+            admin = User(
+                name='Admin',
+                email='admin@flysense.com',
+                is_admin=True
+            )
+            admin.set_password('admin123')
+            db.session.add(admin)
+            db.session.commit()
+            flash('Admin account created! Email: admin@flysense.com, Password: admin123', 'success')
+    except Exception as e:
+        print(f"Error in create_admin: {str(e)}")  # Debug log
+        flash(f'Error creating admin: {str(e)}', 'error')
+    
+    return redirect(url_for('admin_login'))
 
 # Admin authentication decorator
 def admin_required(f):
@@ -510,30 +545,6 @@ def delete_user(user_id):
         print(f"Error: {str(e)}")
     
     return redirect(url_for('admin'))
-
-@app.route('/create_admin')
-def create_admin():
-    try:
-        # Check if admin already exists
-        admin = User.query.filter_by(email='admin@flysense.com').first()
-        if admin:
-            flash('Admin account already exists!', 'info')
-            return redirect(url_for('admin_login'))
-        
-        # Create admin user
-        admin = User(
-            name='Admin',
-            email='admin@flysense.com',
-            is_admin=True
-        )
-        admin.set_password('admin123')
-        db.session.add(admin)
-        db.session.commit()
-        flash('Admin account created! Email: admin@flysense.com, Password: admin123', 'success')
-    except Exception as e:
-        flash(f'Error creating admin: {str(e)}', 'error')
-    
-    return redirect(url_for('admin_login'))
 
 if __name__ == '__main__':
 	app.run(debug=True)
