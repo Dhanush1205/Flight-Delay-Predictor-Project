@@ -198,8 +198,10 @@ def create_route_map(origin, destination, is_delayed):
 
 @app.route('/')
 def index():
-    # Clear any existing session
-    session.clear()
+    if 'user_id' in session:
+        if session.get('is_admin'):
+            return redirect(url_for('admin'))
+        return redirect(url_for('home'))
     return render_template('login.html')
 
 @app.route('/home')
@@ -374,6 +376,11 @@ def history():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if 'user_id' in session:
+        if session.get('is_admin'):
+            return redirect(url_for('admin'))
+        return redirect(url_for('home'))
+        
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -384,6 +391,8 @@ def login():
             session['user_id'] = user.id
             session['is_admin'] = user.is_admin
             flash('Welcome back!', 'success')
+            if user.is_admin:
+                return redirect(url_for('admin'))
             return redirect(url_for('home'))
         else:
             flash('Invalid email or password', 'error')
@@ -393,7 +402,7 @@ def login():
 @app.route('/logout')
 def logout():
     session.clear()
-    flash('You have been logged out successfully', 'success')
+    flash('You have been logged out successfully.', 'success')
     return redirect(url_for('index'))
 
 @app.route('/signup', methods=['GET', 'POST'])
@@ -439,6 +448,9 @@ def signup():
 
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
+    if 'user_id' in session and session.get('is_admin'):
+        return redirect(url_for('admin'))
+        
     try:
         if request.method == 'POST':
             email = request.form.get('email')
