@@ -1,0 +1,496 @@
+.99<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlySense - Flight Delay Prediction</title>
+    <link href="https://fonts.googleapis.com/css?family=Lato:400,700" rel="stylesheet">
+    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}" />
+    <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+    <!-- Add Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <!-- Add Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" />
+    <style>
+        body {
+            font-family: 'Lato', sans-serif;
+            background: url("{{ url_for('static', filename='background.webp') }}");
+            background-size: cover;
+            background-position: center;
+            color: #191a1e;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        .nav-container {
+            padding: 15px 0;
+            position: relative;
+            z-index: 1000;
+        }
+        .nav-links {
+            margin: 0;
+            padding: 0 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nav-links .left-links {
+            display: flex;
+            align-items: center;
+        }
+        .nav-links .right-links {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .nav-links a {
+            color: #4fa3e3;
+            text-decoration: none;
+            margin-right: 20px;
+            font-size: 19px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        .nav-links a:last-child {
+            margin-right: 0;
+        }
+        .nav-links .auth-btn {
+            padding: 8px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        .nav-links .login-btn {
+            background-color: #FF6B6B;
+            border: 2px solid #FF6B6B;
+            color: #fff;
+        }
+        .nav-links .login-btn:hover {
+            background-color: #FF5252;
+            border-color: #FF5252;
+            transform: translateY(-2px);
+        }
+        .nav-links .signup-btn {
+            background-color: #00C853;
+            border: 2px solid #00C853;
+            color: #fff;
+        }
+        .nav-links .signup-btn:hover {
+            background-color: #00B248;
+            border-color: #00B248;
+            transform: translateY(-2px);
+        }
+        .nav-links .admin-btn {
+            background-color: #6200EA;
+            border: 2px solid #6200EA;
+            color: #fff;
+        }
+        .nav-links .admin-btn:hover {
+            background-color: #5502C8;
+            border-color: #5502C8;
+            transform: translateY(-2px);
+        }
+        .form-container {
+            background: transparent;
+            border-radius: 10px;
+            padding: 30px;
+            margin: 40px auto;
+            max-width: 900px;
+        }
+        .booking-form {
+            background: rgba(255,255,255,0.95);
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 16px #00000022;
+        }
+        .booking-cta {
+            padding: 40px 0;
+            background: transparent;
+        }
+        .booking-cta h1 {
+            font-family: 'Lato', sans-serif;
+            color: #fff;
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-shadow: 1px 1px 8px #00000099;
+            text-transform: none !important;
+            background: transparent;
+        }
+        .booking-cta h2 {
+            color: darkblue;
+            font-size: 26px;
+            font-weight: 300;
+            margin-bottom: 10px;
+            text-shadow: 1px 1px 8px #00000099;
+            background: transparent;
+        }
+        .form-label {
+            font-size: 20px;
+            color: #191a1e;
+            font-weight: bold;
+        }
+        .form-control {
+            height: 45px;
+            border: 2px solid #4fa3e3;
+            border-radius: 8px;
+            font-size: 16px;
+            padding: 10px 15px;
+            width: 100%;
+        }
+        .form-control:focus {
+            border-color: #2d6da3;
+            box-shadow: 0 0 0 0.2rem rgba(79, 163, 227, 0.25);
+        }
+        .prediction-result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+            text-align: center;
+        }
+        .prediction-result h3 {
+            color: #4fa3e3;
+            margin-bottom: 10px;
+        }
+        .error-message {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        .submit-btn {
+            background-color: #4fa3e3;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+            width: 100%;
+            max-width: 200px;
+        }
+        .submit-btn:hover {
+            background-color: #2d6da3;
+        }
+        .prediction-result p {
+            font-size: 21px;
+        }
+        .prediction-result strong {
+            font-size: 21px;
+        }
+        .map-container {
+            margin-top: 30px;
+            height: 400px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 16px #00000022;
+        }
+        .back-to-form {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #4fa3e3;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
+        .back-to-form:hover {
+            background-color: #2d6da3;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="nav-container">
+        <div class="container">
+            <div class="nav-links">
+                <div class="left-links">
+                    <a href="{{ url_for('home') }}">Home</a>
+                    <a href="{{ url_for('history') }}">History</a>
+                    <a href="{{ url_for('contact') }}">Contact Us</a>
+                </div>
+                <div class="right-links">
+                    <a href="{{ url_for('login') }}" class="auth-btn login-btn">Login</a>
+                    <a href="{{ url_for('signup') }}" class="auth-btn signup-btn">Sign Up</a>
+                    <a href="{{ url_for('admin_login') }}" class="auth-btn admin-btn">Admin</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container form-container">
+        <div class="row">
+            <div class="col-md-7">
+                <div class="booking-form">
+                    <form action={{ url_for("predict") }} method="post" onsubmit="return validateForm()">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <span class="form-label">Year</span>
+                                    <input type="number" class="form-control" style="width: 100%; min-width: 200px;" name="year" placeholder="Enter year" min="2013" max="2043" required>
+                                    <small class="form-text text-muted">Enter year between 2013 and 2043</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <span class="form-label">Month</span>
+                                    <input type="number" class="form-control" style="width: 100%; min-width: 200px;" name="month" placeholder="Enter month" min="1" max="12" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <span class="form-label">Date</span>
+                                    <input type="number" class="form-control" style="width: 100%; min-width: 200px;" name="day" placeholder="Enter date" min="1" max="31" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if error %}
+                        <div class="error-message">
+                            {{ error }}
+                        </div>
+                        {% endif %}
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <span class="form-label">Select an Airline</span>
+                                    <select class="form-control" style="width: 100%; min-width: 300px;" name="carrier">
+                                        <option value="UA">United Air Lines Inc.(UA)</option>
+                                        <option value="AA">American Airlines Inc.(AA)</option>
+                                        <option value="US">US Airways Inc.(US)</option>
+                                        <option value="F9">Frontier Airlines Inc.(F9)</option>
+                                        <option value="B6">JetBlue Airways(B6)</option>
+                                        <option value="OO">Skywest Airlines Inc.(OO)</option>
+                                        <option value="AS">Alaska Airlines Inc.(AS)</option>
+                                        <option value="WN">Southwest Airlines Co.(WN)</option>
+                                        <option value="DL">Delta Air Lines Inc.(DL)</option>
+                                        <option value="EV">Atlantic Southeast Airlines(EV)</option>
+                                        <option value="HA">Hawaiian Airlines Inc.(HA)</option>
+                                        <option value="MQ">American Eagle Airlines Inc.(MQ)</option>
+                                        <option value="VX">Virgin America(VX)</option>
+                                        <option value="9E">Endeavor Air(9E)</option>
+                                        <option value="FL">AirTran Airways(FL)</option>
+                                        <option value="YV">Mesa Airlines(YV)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <span class="form-label">Flying from</span>
+                                    <select class="form-control" style="width: 100%; min-width: 300px;" name="origin">
+                                        <option value="EWR">Newark Liberty International Airport(EWR)</option>
+                                        <option value="JFK">John F. Kennedy International Airport(New York International Airport)(JFK)</option>
+                                        <option value="LGA">LaGuardia Airport(Marine Air Terminal)(LGA)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <span class="form-label">Flying to</span>
+                                    <select class="form-control" style="width: 100%; min-width: 300px;" name="dest">
+                                        <option value="ATL">Hartsfield-Jackson Atlanta International Airport(ATL)</option>
+                                        <option value="ORD">Chicago O'Hare International Airport(ORD)</option>
+                                        <option value="LAX">Los Angeles International Airport(LAX)</option>
+                                        <option value="BOS">Gen. Edward Lawrence Logan International Airport(BOS)</option>
+                                        <option value="MCO">Orlando International Airport(MCO)</option>
+                                        <option value="CLT">Charlotte Douglas International Airport(CLT)</option>
+                                        <option value="SFO">San Francisco International Airport(SFO)</option>
+                                        <option value="FLL">Fort Lauderdale-Hollywood International Airport(FLL)</option>
+                                        <option value="MIA">Miami International Airport(MIA)</option>
+                                        <option value="DCA">Ronald Reagan Washington National Airport(DCA)</option>
+                                        <option value="DTW">Detroit Metropolitan Airport(DTW)</option>
+                                        <option value="DFW">Dallas/Fort Worth International Airport(DFW)</option>
+                                        <option value="RDU">Raleigh-Durham International Airport(RDU)</option>
+                                        <option value="TPA">Tampa International Airport(TPA)</option>
+                                        <option value="DEN">Denver International Airport(DEN)</option>
+                                        <option value="IAH">George Bush Intercontinental Airport(IAH)</option>
+                                        <option value="MSP">Minneapolis-Saint Paul International Airport(MSP)</option>
+                                        <option value="PBI">Palm Beach International Airport(PBI)</option>
+                                        <option value="BNA">Nashville International Airport(BNA)</option>
+                                        <option value="LAS">McCarran International Airport(LAS)</option>
+                                        <option value="SJU">Luis Muñoz Marín International Airport(SJU)</option>
+                                        <option value="IAD">Washington Dulles International Airport(IAD)</option>
+                                        <option value="PHX">Phoenix Sky Harbor International Airport(PHX)</option>
+                                        <option value="BUF">Buffalo Niagara International Airport(BUF)</option>
+                                        <option value="CLE">Cleveland Hopkins International Airport(CLE)</option>
+                                        <option value="STL">St. Louis International Airport at Lambert Field(STL)</option>
+                                        <option value="MDW">Chicago Midway International Airport(MDW)</option>
+                                        <option value="SEA">Seattle-Tacoma International Airport(SEA)</option>
+                                        <option value="CVG">Cincinnati/Northern Kentucky International Airport(CVG)</option>
+                                        <option value="MSY">Louis Armstrong New Orleans International Airport(MSY)</option>
+                                        <option value="RSW">Southwest Florida International Airport(RSW)</option>
+                                        <option value="CMH">Port Columbus International Airport(CMH)</option>
+                                        <option value="CHS">Charleston International Airport/Charleston AFB(CHS)</option>
+                                        <option value="PIT">Pittsburgh International Airport(PIT)</option>
+                                        <option value="SAN">San Diego International AirportÂ (Lindbergh Field)(SAN)</option>
+                                        <option value="MKE">General Mitchell International Airport(MKE)</option>
+                                        <option value="JAX">Jacksonville International Airport(JAX)</option>
+                                        <option value="BTV">Burlington International Airport(BTV)</option>
+                                        <option value="SLC">Salt Lake City International Airport(SLC)</option>
+                                        <option value="AUS">Austin-Bergstrom International Airport(AUS)</option>
+                                        <option value="ROC">Greater Rochester International Airport(ROC)</option>
+                                        <option value="RIC">Richmond International Airport(RIC)</option>
+                                        <option value="PWM">Portland International Jetport(PWM)</option>
+                                        <option value="HOU">William P. Hobby Airport(HOU)</option>
+                                        <option value="IND">Indianapolis International Airport(IND)</option>
+                                        <option value="MCI">Kansas City International Airport(MCI)</option>
+                                        <option value="SYR">Syracuse Hancock International Airport(SYR)</option>
+                                        <option value="BWI">Baltimore-Washington International Airport(BWI)</option>
+                                        <option value="MEM">Memphis International Airport(MEM)</option>
+                                        <option value="PHL">Philadelphia International Airport(PHL)</option>
+                                        <option value="GSO">Piedmont Triad International Airport(GSO)</option>
+                                        <option value="ORF">Norfolk International Airport(ORF)</option>
+                                        <option value="DAY">James M. Cox Dayton International Airport(DAY)</option>
+                                        <option value="PDX">Portland International Airport(PDX)</option>
+                                        <option value="SRQ">Sarasota-Bradenton International Airport(SRQ)</option>
+                                        <option value="SDF">Louisville International AirportÂ (Standiford Field)(SDF)</option>
+                                        <option value="XNA">Northwest Arkansas Regional Airport(XNA)</option>
+                                        <option value="MHT">Manchester-Boston Regional Airport(MHT)</option>
+                                        <option value="BQN">Rafael Hernández Airport(BQN)</option>
+                                        <option value="CAK">Akron-Canton Regional Airport(CAK)</option>
+                                        <option value="OMA">Eppley Airfield(OMA)</option>
+                                        <option value="SNA">John Wayne AirportÂ (Orange County Airport)(SNA)</option>
+                                        <option value="GSP">Greenville-Spartanburg International Airport(GSP)</option>
+                                        <option value="SAV">Savannah/Hilton Head International Airport(SAV)</option>
+                                        <option value="GRR">Gerald R. Ford International Airport(GRR)</option>
+                                        <option value="HNL">Honolulu International Airport(HNL)</option>
+                                        <option value="LGB">Long Beach AirportÂ (Daugherty Field)(LGB)</option>
+                                        <option value="SAT">San Antonio International Airport(SAT)</option>
+                                        <option value="TYS">McGhee Tyson Airport(TYS)</option>
+                                        <option value="MSN">Dane County Regional Airport(MSN)</option>
+                                        <option value="DSM">Des Moines International Airport(DSM)</option>
+                                        <option value="STT">Cyril E. King Airport(STT)</option>
+                                        <option value="ALB">Albany International Airport(ALB)</option>
+                                        <option value="BDL">Bradley International Airport(BDL)</option>
+                                        <option value="BUR">Bob Hope AirportÂ (Hollywood Burbank Airport)(BUR)</option>
+                                        <option value="PVD">Theodore Francis Green State Airport(PVD)</option>
+                                        <option value="BGR">Bangor International Airport(BGR)</option>
+                                        <option value="PSE">Mercedita Airport(PSE)</option>
+                                        <option value="SJC">Norman Y. Mineta San José International Airport(SJC)</option>
+                                        <option value="OKC">Will Rogers World Airport(OKC)</option>
+                                        <option value="AOK">Oakland International Airport(OAK)</option>
+                                        <option value="TUL">Tulsa International Airport(TUL)</option>
+                                        <option value="SMF">Sacramento International Airport(SMF)</option>
+                                        <option value="BMH">Birmingham-Shuttlesworth International Airport(BHM)</option>
+                                        <option value="ACK">Nantucket Memorial Airport(ACK)</option>
+                                        <option value="AVL">Asheville Regional Airport(AVL)</option>
+                                        <option value="ABQ">Albuquerque International Sunport(ABQ)</option>
+                                        <option value="MVY">Martha's Vineyard Airport(MVY)</option>
+                                        <option value="EGE">Eagle County Regional Airport(EGE)</option>
+                                        <option value="CRW">Yeager Airport(CRW)</option>
+                                        <option value="ILM">Wilmington International Airport(ILM)</option>
+                                        <option value="CAE">Columbia Metropolitan Airport(CAE)</option>
+                                        <option value="TVC">Cherry Capital Airport(TVC)</option>
+                                        <option value="MYR">Myrtle Beach International Airport(MYR)</option>
+                                        <option value="CHO">Charlottesville-Albemarle Airport(CHO)</option>
+                                        <option value="BZN">Bozeman Yellowstone International AirportÂ (Gallatin Field Airport)(BZN)</option>
+                                        <option value="JAC">Jackson Hole Airport(JAC)</option>
+                                        <option value="PSP">Palm Springs International Airport(PSP)</option>
+                                        <option value="EYW">Key West International Airport(EYW)</option>
+                                        <option value="HDN">Yampa Valley AirportÂ (Yampa Valley Regional)(HDN)</option>
+                                        <option value="MTJ">Montrose Regional Airport(MTJ)</option>
+                                        <option value="SBN">South Bend International AirportÂ (South Bend Regional)(SBN)</option>
+                                        <option value="ANC">Ted Stevens Anchorage International Airport(ANC)</option>
+                                        <option value="LEX">Blue Grass Airport(LEX)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-btn">
+                            <button class="submit-btn">Predict</button>
+                        </div>
+
+                    </form>
+
+                    {% if prediction_text is not none and prediction_text is defined %}
+                    <div class="prediction-result" id="prediction-result">
+                        <h3>Prediction Result</h3>
+                        <p>Your flight is predicted to be: 
+                            {% if prediction_text == 1 %}
+                                <strong style="color: #dc3545;">Delayed</strong>
+                                {% if delay_minutes is not none %}
+                                    <br>
+                                    <span style="font-size: 18px;">Estimated Delay: <strong>{{ delay_minutes }} minutes</strong></span>
+                                {% endif %}
+                            {% else %}
+                                <strong style="color: #28a745;">On Time</strong>
+                            {% endif %}
+                        </p>
+                        <div class="probability-info" style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                            <p style="margin-bottom: 5px;">Prediction Confidence:</p>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span>On Time: <strong>{{ on_time_prob }}%</strong></span>
+                                <span>Delayed: <strong>{{ delayed_prob }}%</strong></span>
+                            </div>
+                            <div style="margin-top: 10px; height: 10px; background: #e9ecef; border-radius: 5px; overflow: hidden;">
+                                <div style="width: {{ on_time_prob }}%; height: 100%; background: #28a745; float: left;"></div>
+                                <div style="width: {{ delayed_prob }}%; height: 100%; background: #dc3545; float: left;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if route_map is not none and route_map is defined %}
+                    <div class="map-container">
+                        {{ route_map|safe }}
+                    </div>
+                    {% endif %}
+
+                </div>
+            </div>
+
+            <div class="col-md-5">
+                <div class="booking-cta">
+                    <h1>FlySense</h1>
+                    <h2 style="color: #00e6ff; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); font-weight: 600; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 5px;">Smarter Skies, On-time Travels</h2>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+    function validateForm() {
+        const year = document.getElementsByName('year')[0].value;
+        const month = document.getElementsByName('month')[0].value;
+        const day = document.getElementsByName('day')[0].value;
+        
+        // Basic date validation
+        const date = new Date(year, month - 1, day);
+        if (date.getMonth() !== month - 1) {
+            alert('Invalid date. Please check the month and day values.');
+            return false;
+        }
+        
+        return true;
+    }
+
+    // Scroll to prediction result if it exists
+    window.onload = function() {
+        const predictionResult = document.getElementById('prediction-result');
+        if (predictionResult) {
+            predictionResult.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+    </script>
+</body>
+
+</html>
