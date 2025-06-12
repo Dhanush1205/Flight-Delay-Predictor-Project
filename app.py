@@ -23,6 +23,10 @@ app = Flask(__name__,
 )
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 
+# Configure session
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
+
 # Configure password hashing
 app.config['SECURITY_PASSWORD_HASH'] = 'pbkdf2_sha256'
 app.config['SECURITY_PASSWORD_SALT'] = os.environ.get('SECURITY_PASSWORD_SALT', os.urandom(24).hex())
@@ -75,6 +79,18 @@ class Contact(db.Model):
 # Create database tables
 with app.app_context():
     db.create_all()
+    # Create admin account if it doesn't exist
+    admin = User.query.filter_by(email='admin@flysense.com').first()
+    if not admin:
+        admin = User(
+            name='Admin',
+            email='admin@flysense.com',
+            is_admin=True
+        )
+        admin.set_password('admin123')
+        db.session.add(admin)
+        db.session.commit()
+        print("Admin account created successfully!")
 
 try:
     # Import dataset with absolute path
@@ -178,8 +194,8 @@ def create_route_map(origin, destination, is_delayed):
 
 @app.route('/')
 def index():
-    if 'user_id' in session:
-        return redirect(url_for('home'))
+    # Clear any existing session
+    session.clear()
     return render_template('login.html')
 
 @app.route('/home')
@@ -354,9 +370,6 @@ def history():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if 'user_id' in session:
-        return redirect(url_for('home'))
-        
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -375,11 +388,9 @@ def login():
 
 @app.route('/logout')
 def logout():
-    session.pop('user_id', None)
-    session.pop('is_admin', None)  # Remove admin status from session
-    session.pop('predictions', None)
-    flash('You have been logged out', 'success')
-    return redirect(url_for('login'))
+    session.clear()
+    flash('You have been logged out successfully', 'success')
+    return redirect(url_for('index'))
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -424,9 +435,6 @@ def signup():
 
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
-    if 'user_id' in session and session.get('is_admin'):
-        return redirect(url_for('admin'))
-        
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -439,7 +447,7 @@ def admin_login():
             flash('Welcome back, Admin!', 'success')
             return redirect(url_for('admin'))
         else:
-            flash('Invalid email or password', 'error')
+            flash('Invalid admin credentials', 'error')
     
     return render_template('admin_login.html')
 
@@ -500,22 +508,28 @@ def delete_user(user_id):
 
 @app.route('/create_admin')
 def create_admin():
-    # Create admin user if it doesn't exist
-    admin = User.query.filter_by(email='admin@example.com').first()
-    if not admin:
+    try:
+        # Check if admin already exists
+        admin = User.query.filter_by(email='admin@flysense.com').first()
+        if admin:
+            flash('Admin account already exists!', 'info')
+            return redirect(url_for('admin_login'))
+        
+        # Create admin user
         admin = User(
             name='Admin',
-            email='admin@example.com',
+            email='admin@flysense.com',
             is_admin=True
         )
-        admin.set_password('admin123')  # Set a default password
+        admin.set_password('admin123')
         db.session.add(admin)
         db.session.commit()
-        flash('Admin account created successfully!', 'success')
-    else:
-        flash('Admin account already exists!', 'info')
+        flash('Admin account created! Email: admin@flysense.com, Password: admin123', 'success')
+    except Exception as e:
+        flash(f'Error creating admin: {str(e)}', 'error')
+    
     return redirect(url_for('admin_login'))
 
 if __name__ == '__main__':
-	app.run(debug=False)
+	app.run(debug=True)
 # For mac, make 'app.run(debug=True)'
