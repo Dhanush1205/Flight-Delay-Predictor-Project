@@ -76,13 +76,13 @@ class Contact(db.Model):
     def __repr__(self):
         return f'<Contact {self.name}>'
 
-# Create database tables
+# Initialize database
 with app.app_context():
-    db.create_all()
-    # Create admin account if it doesn't exist
-    admin = User.query.filter_by(email='admin@flysense.com').first()
-    if not admin:
-        try:
+    try:
+        db.create_all()
+        # Create admin account if it doesn't exist
+        admin = User.query.filter_by(email='admin@flysense.com').first()
+        if not admin:
             admin = User(
                 name='Admin',
                 email='admin@flysense.com',
@@ -92,9 +92,9 @@ with app.app_context():
             db.session.add(admin)
             db.session.commit()
             print("Admin account created successfully!")
-        except Exception as e:
-            print(f"Error creating admin account: {str(e)}")
-            db.session.rollback()
+    except Exception as e:
+        print(f"Error during database initialization: {str(e)}")
+        db.session.rollback()
 
 try:
     # Import dataset with absolute path
@@ -439,21 +439,26 @@ def signup():
 
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
-    if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
+    try:
+        if request.method == 'POST':
+            email = request.form.get('email')
+            password = request.form.get('password')
+            
+            user = User.query.filter_by(email=email).first()
+            
+            if user and user.is_admin and user.check_password(password):
+                session['user_id'] = user.id
+                session['is_admin'] = True
+                flash('Welcome back, Admin!', 'success')
+                return redirect(url_for('admin'))
+            else:
+                flash('Invalid admin credentials', 'error')
         
-        user = User.query.filter_by(email=email).first()
-        
-        if user and user.is_admin and user.check_password(password):
-            session['user_id'] = user.id
-            session['is_admin'] = True
-            flash('Welcome back, Admin!', 'success')
-            return redirect(url_for('admin'))
-        else:
-            flash('Invalid admin credentials', 'error')
-    
-    return render_template('admin_login.html')
+        return render_template('admin_login.html')
+    except Exception as e:
+        print(f"Error in admin_login: {str(e)}")
+        flash('An error occurred. Please try again.', 'error')
+        return render_template('admin_login.html')
 
 # Admin authentication decorator
 def admin_required(f):
