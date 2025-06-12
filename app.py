@@ -405,43 +405,32 @@ def logout():
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
-    # If user is already logged in, redirect to home
-    if 'user_id' in session:
-        return redirect(url_for('home'))
-        
     if request.method == 'POST':
-        try:
-            # Get form data
-            name = request.form.get('name')
-            email = request.form.get('email')
-            password = request.form.get('password')
-            confirm_password = request.form.get('confirm_password')
-
-            # Validate passwords match
-            if password != confirm_password:
-                flash('Passwords do not match!', 'error')
-                return render_template('signup.html')
-
-            # Check if user already exists
-            if User.query.filter_by(email=email).first():
-                flash('Email already registered!', 'error')
-                return render_template('signup.html')
-
-            # Create new user
-            new_user = User(name=name, email=email)
-            new_user.set_password(password)
-            
-            # Save to database
-            db.session.add(new_user)
-            db.session.commit()
-            
-            flash('Registration successful! Please login.', 'success')
-            return redirect(url_for('login'))
-            
-        except Exception as e:
-            flash('An error occurred during registration.', 'error')
+        name = request.form.get('name')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        # Check if user already exists
+        if User.query.filter_by(email=email).first():
+            flash('Email already registered', 'error')
             return render_template('signup.html')
-            
+        
+        # Create new user
+        user = User(name=name, email=email)
+        user.set_password(password)
+        
+        try:
+            db.session.add(user)
+            db.session.commit()
+            session['user_id'] = user.id
+            session['is_admin'] = False
+            flash('Account created successfully!', 'success')
+            return redirect(url_for('home'))
+        except Exception as e:
+            db.session.rollback()
+            flash('Error creating account. Please try again.', 'error')
+            return render_template('signup.html')
+    
     return render_template('signup.html')
 
 @app.route('/admin_login', methods=['GET', 'POST'])
