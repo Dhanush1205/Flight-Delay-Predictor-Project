@@ -58,7 +58,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -80,16 +80,19 @@ class Contact(db.Model):
 # Initialize database
 with app.app_context():
     try:
+        # Drop all tables and recreate
+        db.drop_all()
         db.create_all()
+        
         # Create admin account if it doesn't exist
         admin = User.query.filter_by(email='admin@flysense.com').first()
         if not admin:
             admin = User(
                 name='Admin',
                 email='admin@flysense.com',
+                password_hash=generate_password_hash('admin123'),
                 is_admin=True
             )
-            admin.set_password('admin123')
             db.session.add(admin)
             db.session.commit()
             print("Admin account created successfully!")
@@ -456,7 +459,7 @@ def admin_login():
         # Find user with admin role
         user = User.query.filter_by(email=email, is_admin=True).first()
         
-        if user and check_password_hash(user.password, password):
+        if user and check_password_hash(user.password_hash, password):
             session['user_id'] = user.id
             session['is_admin'] = True
             flash('Admin login successful!', 'success')
@@ -485,7 +488,7 @@ def create_admin():
         
         if admin:
             # Reset admin password
-            admin.password = generate_password_hash('admin123')
+            admin.password_hash = generate_password_hash('admin123')
             admin.is_admin = True  # Ensure admin flag is set
             db.session.commit()
             flash('Admin password has been reset to: admin123', 'success')
@@ -494,7 +497,7 @@ def create_admin():
             admin = User(
                 name='Admin',
                 email='admin@flysense.com',
-                password=generate_password_hash('admin123'),
+                password_hash=generate_password_hash('admin123'),
                 is_admin=True
             )
             db.session.add(admin)
