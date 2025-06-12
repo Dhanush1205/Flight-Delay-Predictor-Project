@@ -82,15 +82,19 @@ with app.app_context():
     # Create admin account if it doesn't exist
     admin = User.query.filter_by(email='admin@flysense.com').first()
     if not admin:
-        admin = User(
-            name='Admin',
-            email='admin@flysense.com',
-            is_admin=True
-        )
-        admin.set_password('admin123')
-        db.session.add(admin)
-        db.session.commit()
-        print("Admin account created successfully!")
+        try:
+            admin = User(
+                name='Admin',
+                email='admin@flysense.com',
+                is_admin=True
+            )
+            admin.set_password('admin123')
+            db.session.add(admin)
+            db.session.commit()
+            print("Admin account created successfully!")
+        except Exception as e:
+            print(f"Error creating admin account: {str(e)}")
+            db.session.rollback()
 
 try:
     # Import dataset with absolute path
