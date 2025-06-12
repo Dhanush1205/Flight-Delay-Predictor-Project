@@ -411,85 +411,97 @@ def signup():
         password = request.form.get('password')
         
         # Check if user already exists
-        if User.query.filter_by(email=email).first():
-            flash('Email already registered', 'error')
-            return render_template('signup.html')
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            flash('Email already registered!', 'danger')
+            return redirect(url_for('signup'))
         
         # Create new user
-        user = User(name=name, email=email)
-        user.set_password(password)
+        new_user = User(
+            name=name,
+            email=email,
+            password_hash=generate_password_hash(password),
+            is_admin=False
+        )
         
         try:
-            db.session.add(user)
+            db.session.add(new_user)
             db.session.commit()
-            session['user_id'] = user.id
+            
+            # Log in the user automatically
+            session['user_id'] = new_user.id
             session['is_admin'] = False
-            flash('Account created successfully!', 'success')
+            
+            flash('Registration successful! You are now logged in.', 'success')
             return redirect(url_for('home'))
         except Exception as e:
             db.session.rollback()
-            flash('Error creating account. Please try again.', 'error')
-            return render_template('signup.html')
+            flash('Error creating account. Please try again.', 'danger')
+            return redirect(url_for('signup'))
     
     return render_template('signup.html')
 
 @app.route('/admin_login', methods=['GET', 'POST'])
 def admin_login():
-    try:
-        if request.method == 'POST':
-            email = request.form.get('email')
-            password = request.form.get('password')
-            
-            print(f"Attempting admin login with email: {email}")  # Debug log
-            
-            user = User.query.filter_by(email=email).first()
-            
-            if user:
-                print(f"User found: {user.name}, is_admin: {user.is_admin}")  # Debug log
-                if user.is_admin and user.check_password(password):
-                    session['user_id'] = user.id
-                    session['is_admin'] = True
-                    flash('Welcome back, Admin!', 'success')
-                    return redirect(url_for('admin'))
-                else:
-                    print("Password check failed or user is not admin")  # Debug log
-                    flash('Invalid admin credentials', 'error')
-            else:
-                print("No user found with this email")  # Debug log
-                flash('Invalid admin credentials', 'error')
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
         
-        return render_template('admin_login.html')
-    except Exception as e:
-        print(f"Error in admin_login: {str(e)}")
-        flash('An error occurred. Please try again.', 'error')
-        return render_template('admin_login.html')
+        # Debug logging
+        print(f"Admin login attempt - Email: {email}")
+        
+        # Find user with admin role
+        user = User.query.filter_by(email=email, is_admin=True).first()
+        
+        if user and check_password_hash(user.password_hash, password):
+            session['user_id'] = user.id
+            session['is_admin'] = True
+            flash('Admin login successful!', 'success')
+            return redirect(url_for('admin'))
+        else:
+            flash('Invalid admin credentials!', 'danger')
+            return redirect(url_for('admin_login'))
+    
+    return render_template('admin_login.html')
+
+@app.route('/admin')
+def admin():
+    if not session.get('is_admin'):
+        flash('Please login as admin first!', 'danger')
+        return redirect(url_for('admin_login'))
+    
+    users = User.query.all()
+    contacts = Contact.query.all()
+    return render_template('admin.html', users=users, contacts=contacts)
 
 @app.route('/create_admin')
 def create_admin():
     try:
         # Check if admin already exists
         admin = User.query.filter_by(email='admin@flysense.com').first()
+        
         if admin:
-            # Update admin password to ensure it's correct
-            admin.set_password('admin123')
+            # Reset admin password
+            admin.password_hash = generate_password_hash('admin123')
             db.session.commit()
-            flash('Admin account exists! Password has been reset. Email: admin@flysense.com, Password: admin123', 'success')
+            flash('Admin password has been reset to: admin123', 'success')
         else:
-            # Create admin user
+            # Create new admin account
             admin = User(
                 name='Admin',
                 email='admin@flysense.com',
+                password_hash=generate_password_hash('admin123'),
                 is_admin=True
             )
-            admin.set_password('admin123')
             db.session.add(admin)
             db.session.commit()
-            flash('Admin account created! Email: admin@flysense.com, Password: admin123', 'success')
+            flash('Admin account created with password: admin123', 'success')
+        
+        return redirect(url_for('admin_login'))
     except Exception as e:
-        print(f"Error in create_admin: {str(e)}")  # Debug log
-        flash(f'Error creating admin: {str(e)}', 'error')
-    
-    return redirect(url_for('admin_login'))
+        print(f"Error creating admin: {str(e)}")
+        flash('Error creating admin account', 'danger')
+        return redirect(url_for('admin_login'))
 
 # Admin authentication decorator
 def admin_required(f):
