@@ -17,7 +17,11 @@ import requests  # Add this import at the top with other imports
 
 # Initialize Flask app
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
+
+# Get the absolute path to the Data directory
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DATA_DIR = os.path.join(BASE_DIR, 'Data')
 
 # Login required decorator
 def login_required(f):
@@ -64,41 +68,49 @@ class Contact(db.Model):
 with app.app_context():
     db.create_all()
 
-# Import dataset 
-df = pd.read_csv('Data/Processed_data15.csv')
+try:
+    # Import dataset with absolute path
+    data_file = os.path.join(DATA_DIR, 'Processed_data15.csv')
+    if not os.path.exists(data_file):
+        raise FileNotFoundError(f"Data file not found: {data_file}")
+    
+    df = pd.read_csv(data_file)
+    
+    # Set year range (extending to future)
+    min_year = df['year'].min()  # 2013
+    max_year = 2043  # Extending to 20 years in future
 
-# Set year range (extending to future)
-min_year = df['year'].min()  # 2013
-max_year = 2043  # Extending to 20 years in future
+    # Label Encoding
+    le_carrier = LabelEncoder()
+    df['carrier'] = le_carrier.fit_transform(df['carrier'])
 
-# Label Encoding
-le_carrier = LabelEncoder()
-df['carrier'] = le_carrier.fit_transform(df['carrier'])
+    le_dest = LabelEncoder()
+    df['dest'] = le_dest.fit_transform(df['dest'])
 
-le_dest = LabelEncoder()
-df['dest'] = le_dest.fit_transform(df['dest'])
+    le_origin = LabelEncoder()
+    df['origin'] = le_origin.fit_transform(df['origin'])
 
-le_origin = LabelEncoder()
-df['origin'] = le_origin.fit_transform(df['origin'])
+    # Converting Pandas DataFrame into a Numpy array
+    X = df.iloc[:, 0:6].values # from column(years) to column(distance)
+    y = df['delayed']
 
-# Converting Pandas DataFrame into a Numpy array
-X = df.iloc[:, 0:6].values # from column(years) to column(distance)
-y = df['delayed']
+    X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.25,random_state=61)
 
-X_train, X_test, y_train, y_test = train_test_split(X,y, test_size=0.25,random_state=61)
+    # Create and train Random Forest
+    rf_classifier = RandomForestClassifier(
+        n_estimators=200,  # Increase number of trees
+        max_depth=10,      # Increase depth
+        min_samples_split=5,
+        min_samples_leaf=2,
+        class_weight='balanced',  # Handle class imbalance
+        random_state=42
+    )
+    rf_classifier.fit(X_train, y_train)
 
-# Create and train Random Forest
-rf_classifier = RandomForestClassifier(
-    n_estimators=200,  # Increase number of trees
-    max_depth=10,      # Increase depth
-    min_samples_split=5,
-    min_samples_leaf=2,
-    class_weight='balanced',  # Handle class imbalance
-    random_state=42
-)
-rf_classifier.fit(X_train, y_train)
-
-model = rf_classifier  # Use Random Forest for predictions
+    model = rf_classifier  # Use Random Forest for predictions
+except Exception as e:
+    print(f"Error loading data: {str(e)}")
+    raise
 
 # Replace Aviationstack with OpenSky configuration
 OPENSKY_BASE_URL = 'https://opensky-network.org/api'
